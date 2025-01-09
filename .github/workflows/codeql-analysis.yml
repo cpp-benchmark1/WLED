@@ -30,7 +30,8 @@ jobs:
     - if: matrix.build-mode == 'manual'
       shell: bash
       run: |
-        make
+        sudo apt-get install npm -y
+        npm install
     - name: Free disk space
       run: |
           sudo docker rmi $(docker image ls -aq) >/dev/null 2>&1 || true
