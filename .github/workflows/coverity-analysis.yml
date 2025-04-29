@@ -40,7 +40,10 @@ jobs:
           echo "Coverity Tool installed successfully"
       - name: Build with Coverity
         run: |
-          coverity_tool/bin/cov-build --dir cov-int make || true
+          npm install
+          python -m pip install --upgrade pip
+          pip install platformio
+          coverity_tool/bin/cov-build --dir cov-int pio run || echo 'Errors when building using Coverity'
       - name: Compress with bzip2
         run: |
           tar cjvf myproject.tar.bz2 cov-int
