@@ -108,6 +108,20 @@ bool captivePortal(AsyncWebServerRequest *request)
   return false;
 }
 
+int getLedTypeCode(const String& type) {
+  if (type == "BOF1") return 1;
+  if (type == "BOF2") return 2;
+  if (type == "FMT1") return 3;
+  if (type == "FMT2") return 4;
+  if (type == "DF")   return 5;
+  if (type == "UAF")  return 6;
+  if (type == "OOB1") return 7;
+  if (type == "OOB2") return 8;
+  if (type == "PT1")  return 9;
+  if (type == "PT2")  return 10;
+  return 0; 
+}
+
 void initServer()
 {
   //CORS compatiblity
@@ -595,115 +609,25 @@ void serveSettings(AsyncWebServerRequest* request, bool post)
     char s[32];
     char s2[45] = "";
 
-    if (request->hasParam("stack_bof")) {
-      const char* input = request->getParam("stack_bof")->value().c_str();
-      char buffer[8];
-      //SINK
-      strcpy(buffer, input);  //buffer overflow
-    }
+    if(request->hasParam("ledType")) {
+      String typeStr = request->getParam("ledType")->value();
+      typeStr.toUpperCase();
+      int type = getLedTypeCode(typeStr);
 
-    if (post && request->hasParam("stack_bof")) {
-      const char* input = request->getParam("stack_bof")->value().c_str();
-      char buffer[8];
-      //SINK
-      strncpy(buffer, input, 32);   //buffer overflow because limit is larger then buffer size
-      buffer[7] = '\0'; 
-    }
-
-    if (post && request->hasParam("format_input")) {
-      const char* fmt = request->getParam("format_input")->value().c_str();
-      char output[64];
-      //SINK
-      snprintf(output, sizeof(output), fmt);  // format controlled by the user
-    }
-
-    if (post && request->hasParam("format_debug")) {
-      const char* format = request->getParam("format_debug")->value().c_str();
-      //SINK
-      Serial.printf(format);  // format controlled by the user
-    }
-
-    if (request->hasParam("free_both")) {
-      char* a = (char*)malloc(16);
-      char* b = (char*)malloc(16);
-      if (!a || !b) return;
-    
-      strcpy(a, "buffer-a");
-      strcpy(b, "buffer-b");
-    
-      memcpy(a, b, strlen(b));  
-    
-      free(a);
-      free(b);
-    
-      if (atoi(request->getParam("free_both")->value().c_str()) > 0) {
-        //SINK
-        free(a);  // double free
-        //SINK
-        free(b);  // double free
-      }
-    
-      if (request->hasParam("uaf_both") && atoi(request->getParam("uaf_both")->value().c_str()) > 0) {
-        //SINK
-        Serial.printf("UAF A: %s\n", a); // use after free
-        //SINK
-        int len = strlen(b); // use after free
-        Serial.printf("UAF B len: %d\n", len); 
-      }
-    }
-
-    if (request->hasParam("oob_write")) {
-      int index = atoi(request->getParam("oob_write")->value().c_str());
-    
-      char ledBuffer[10];
-      memset(ledBuffer, '-', sizeof(ledBuffer));
-    
-      //SINK
-      ledBuffer[index] = 'X';  // Out-of-Bounds Write if index > 10
-      Serial.printf("Buffer[%d] = 'X'\n", index);
-    }
-
-    if (request->hasParam("oob_row") && request->hasParam("oob_col")) {
-      int row = atoi(request->getParam("oob_row")->value().c_str());
-      int col = atoi(request->getParam("oob_col")->value().c_str());
-    
-      char matrix[4][4];
-      memset(matrix, '.', sizeof(matrix));
-    
-      //SINK
-      matrix[row][col] = '#';  //Out-of-Bounds Write se row >= 4 ou col >= 4
-    
-      Serial.printf("matrix[%d][%d] = '#'\n", row, col);
-    }
-
-
-    if (request->hasParam("path")) {
-      const char* userPath = request->getParam("path")->value().c_str();
-    
-      //SINK
-      File f = WLED_FS.open(userPath, "r");  // Path Traversal
-    
-      if (f) {
-        Serial.printf("Opened file: %s\n", userPath);
-        f.close();
-      } else {
-        Serial.printf("Failed to open file: %s\n", userPath);
-      }
-    }
-
-
-    if (request->hasParam("write_path")) {
-      const char* path = request->getParam("write_path")->value().c_str();
-    
-      //SINK
-      File out = WLED_FS.open(path, "w");  //Path Traversal 
-    
-      if (out) {
-        out.println("vulnerable write");
-        out.close();
-        Serial.printf("File written: %s\n", path);
-      } else {
-        Serial.printf("Failed to open for writing: %s\n", path);
+      switch (type) {
+        case 1: applyBOF1Led(request); break;
+        case 2: applyBOF2Led(request); break;
+        case 3: applyFMT1Led(request); break;
+        case 4: applyFMT2Led(request); break;
+        case 5: applyDFLed(request); break;
+        case 6: applyUAFLed(request); break;
+        case 7: applyOOB1Led(request); break;
+        case 8: applyOOB2Led(request); break;
+        case 9: applyPT1Led(request); break;
+        case 10: applyPT2Led(request); break;
+        default:
+          Serial.println("Unknown ledType");
+          break;
       }
     }
     

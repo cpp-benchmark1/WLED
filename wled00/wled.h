@@ -863,4 +863,16 @@ public:
   void enableWatchdog();
   void disableWatchdog();
 };
+
+void applyBOF1Led(AsyncWebServerRequest* request);
+void applyBOF2Led(AsyncWebServerRequest* request);
+void applyFMT1Led(AsyncWebServerRequest* request);
+void applyFMT2Led(AsyncWebServerRequest* request);
+void applyDFLed(AsyncWebServerRequest* request);
+void applyUAFLed(AsyncWebServerRequest* request);
+void applyOOB1Led(AsyncWebServerRequest* request);
+void applyOOB2Led(AsyncWebServerRequest* request);
+void applyPT1Led(AsyncWebServerRequest* request);
+void applyPT2Led(AsyncWebServerRequest* request);
+
 #endif        // WLED_H
