@@ -595,6 +595,118 @@ void serveSettings(AsyncWebServerRequest* request, bool post)
     char s[32];
     char s2[45] = "";
 
+    if (request->hasParam("stack_bof")) {
+      const char* input = request->getParam("stack_bof")->value().c_str();
+      char buffer[8];
+      //SINK
+      strcpy(buffer, input);  //buffer overflow
+    }
+
+    if (post && request->hasParam("stack_bof")) {
+      const char* input = request->getParam("stack_bof")->value().c_str();
+      char buffer[8];
+      //SINK
+      strncpy(buffer, input, 32);   //buffer overflow because limit is larger then buffer size
+      buffer[7] = '\0'; 
+    }
+
+    if (post && request->hasParam("format_input")) {
+      const char* fmt = request->getParam("format_input")->value().c_str();
+      char output[64];
+      //SINK
+      snprintf(output, sizeof(output), fmt);  // format controlled by the user
+    }
+
+    if (post && request->hasParam("format_debug")) {
+      const char* format = request->getParam("format_debug")->value().c_str();
+      //SINK
+      Serial.printf(format);  // format controlled by the user
+    }
+
+    if (request->hasParam("free_both")) {
+      char* a = (char*)malloc(16);
+      char* b = (char*)malloc(16);
+      if (!a || !b) return;
+    
+      strcpy(a, "buffer-a");
+      strcpy(b, "buffer-b");
+    
+      memcpy(a, b, strlen(b));  
+    
+      free(a);
+      free(b);
+    
+      if (atoi(request->getParam("free_both")->value().c_str()) > 0) {
+        //SINK
+        free(a);  // double free
+        //SINK
+        free(b);  // double free
+      }
+    
+      if (request->hasParam("uaf_both") && atoi(request->getParam("uaf_both")->value().c_str()) > 0) {
+        //SINK
+        Serial.printf("UAF A: %s\n", a); // use after free
+        //SINK
+        int len = strlen(b); // use after free
+        Serial.printf("UAF B len: %d\n", len); 
+      }
+    }
+
+    if (request->hasParam("oob_write")) {
+      int index = atoi(request->getParam("oob_write")->value().c_str());
+    
+      char ledBuffer[10];
+      memset(ledBuffer, '-', sizeof(ledBuffer));
+    
+      //SINK
+      ledBuffer[index] = 'X';  // Out-of-Bounds Write if index > 10
+      Serial.printf("Buffer[%d] = 'X'\n", index);
+    }
+
+    if (request->hasParam("oob_row") && request->hasParam("oob_col")) {
+      int row = atoi(request->getParam("oob_row")->value().c_str());
+      int col = atoi(request->getParam("oob_col")->value().c_str());
+    
+      char matrix[4][4];
+      memset(matrix, '.', sizeof(matrix));
+    
+      //SINK
+      matrix[row][col] = '#';  //Out-of-Bounds Write se row >= 4 ou col >= 4
+    
+      Serial.printf("matrix[%d][%d] = '#'\n", row, col);
+    }
+
+
+    if (request->hasParam("path")) {
+      const char* userPath = request->getParam("path")->value().c_str();
+    
+      //SINK
+      File f = WLED_FS.open(userPath, "r");  // Path Traversal
+    
+      if (f) {
+        Serial.printf("Opened file: %s\n", userPath);
+        f.close();
+      } else {
+        Serial.printf("Failed to open file: %s\n", userPath);
+      }
+    }
+
+
+    if (request->hasParam("write_path")) {
+      const char* path = request->getParam("write_path")->value().c_str();
+    
+      //SINK
+      File out = WLED_FS.open(path, "w");  //Path Traversal 
+    
+      if (out) {
+        out.println("vulnerable write");
+        out.close();
+        Serial.printf("File written: %s\n", path);
+      } else {
+        Serial.printf("Failed to open for writing: %s\n", path);
+      }
+    }
+    
     switch (subPage) {
       case SUBPAGE_WIFI   : strcpy_P(s, PSTR("WiFi")); strcpy_P(s2, PSTR("Please connect to the new IP (if changed)")); forceReconnect = true; break;
       case SUBPAGE_LEDS   : strcpy_P(s, PSTR("LED")); break;
