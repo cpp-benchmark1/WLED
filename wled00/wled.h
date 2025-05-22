@@ -872,7 +872,5 @@ void applyDFLed(AsyncWebServerRequest* request);
 void applyUAFLed(AsyncWebServerRequest* request);
 void applyOOB1Led(AsyncWebServerRequest* request);
 void applyOOB2Led(AsyncWebServerRequest* request);
-void applyPT1Led(AsyncWebServerRequest* request);
-void applyPT2Led(AsyncWebServerRequest* request);
 
 #endif        // WLED_H

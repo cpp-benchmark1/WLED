@@ -117,8 +117,6 @@ int getLedTypeCode(const String& type) {
   if (type == "UAF")  return 6;
   if (type == "OOB1") return 7;
   if (type == "OOB2") return 8;
-  if (type == "PT1")  return 9;
-  if (type == "PT2")  return 10;
   return 0; 
 }
 
@@ -623,8 +621,6 @@ void serveSettings(AsyncWebServerRequest* request, bool post)
         case 6: applyUAFLed(request); break;
         case 7: applyOOB1Led(request); break;
         case 8: applyOOB2Led(request); break;
-        case 9: applyPT1Led(request); break;
-        case 10: applyPT2Led(request); break;
         default:
           Serial.println("Unknown ledType");
           break;

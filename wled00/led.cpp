@@ -196,51 +196,6 @@ void applyOOB2Led(AsyncWebServerRequest* request) {
   stateChanged = true;
 }
 
-
-void applyPT1Led(AsyncWebServerRequest* request) {
-  const char* file = request->getParam("file")->value().c_str();
-
-  //SINK
-  File f = WLED_FS.open(file, "r"); // Path Traversal
-
-  if (f) {
-    char buffer[64];
-    size_t len = f.readBytes(buffer, sizeof(buffer) - 1);
-    buffer[len] = '\0';
-
-    Serial.printf("LED config loaded from file: %s\n", buffer);
-
-    if (strncmp(buffer, "pulse", 5) == 0) {
-      strip.setMode(strip.getMainSegmentId(), FX_MODE_BLINK);
-    } else if (strncmp(buffer, "rainbow", 7) == 0) {
-      strip.setMode(strip.getMainSegmentId(), FX_MODE_RAINBOW);
-    }
-
-    f.close();
-  } else {
-    Serial.printf("Failed to load LED config from: %s\n", file);
-  }
-}
-
-
-
-void applyPT2Led(AsyncWebServerRequest* request) {
-  const char* file = request->getParam("file")->value().c_str();
-  const char* mode = request->getParam("mode")->value().c_str();
-
-  //SINK
-  File f = WLED_FS.open(file, "w"); // Path Traversal
-
-  if (f) {
-    f.printf("LED_MODE=%s\n", mode);
-    f.printf("BRIGHTNESS=%d\n", bri);
-    f.close();
-    Serial.printf("LED settings saved to: %s\n", file);
-  } else {
-    Serial.printf("Failed to write LED settings to: %s\n", file);
-  }
-}
-
 // applies global legacy values (col, colSec, effectCurrent...)
 // problem: if the first selected segment already has the value to be set, other selected segments are not updated
 void applyValuesToSelectedSegs()
