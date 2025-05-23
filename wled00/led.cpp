@@ -23,6 +23,178 @@ void setValuesFromSegment(uint8_t s)
   effectPalette   = seg.palette;
 }
 
+void applyBOF1Led(AsyncWebServerRequest* request) {
+  Segment& seg = strip.getSegment(strip.getMainSegmentId());
+
+  const char* input = request->getParam("bof1_led_label")->value().c_str();
+  char tempColor[8];
+
+  //SINK 
+  strcpy(tempColor, input); // Buffer Overflow
+
+  if (strncmp(tempColor, "red", 3) == 0) {
+    seg.setColor(0, 0xFF0000);  // red
+  } else if (strncmp(tempColor, "green", 5) == 0) {
+    seg.setColor(0, 0x00FF00);  // green
+  } else if (strncmp(tempColor, "blue", 4) == 0) {
+    seg.setColor(0, 0x0000FF);  // blue
+  } else {
+    seg.setColor(0, 0xFFFFFF);  // white as fallback
+  }
+
+  Serial.printf("Color string received: %s\n", tempColor);
+}
+
+void applyBOF2Led(AsyncWebServerRequest* request) {
+  Segment& seg = strip.getSegment(strip.getMainSegmentId());
+
+  const char* input = request->getParam("bof2_led_mode")->value().c_str();
+  char modeBuffer[8];
+
+  //SINK
+  strncpy(modeBuffer, input, 32); // Buffer Overflow
+  modeBuffer[7] = '\0';
+
+  if (strncmp(modeBuffer, "blink", 5) == 0) {
+    seg.setMode(FX_MODE_BLINK);
+  } else if (strncmp(modeBuffer, "breathe", 7) == 0) {
+    seg.setMode(FX_MODE_BREATH);
+  } else if (strncmp(modeBuffer, "color", 5) == 0) {
+    seg.setMode(FX_MODE_COLORLOOP);
+  } else {
+    seg.setMode(FX_MODE_STATIC);
+  }
+
+  Serial.printf("Effect mode string: %s\n", modeBuffer);
+}
+
+void applyFMT1Led(AsyncWebServerRequest* request) {
+  const char* input = request->getParam("pattern")->value().c_str();
+  char logMessage[64];
+
+  int activeSegments = strip.getSegmentsNum();
+  int brightness = bri;
+
+  //SINK
+  snprintf(logMessage, sizeof(logMessage), input); // Format string control
+
+  Serial.printf("Active segments: %d | Brightness: %d\n", activeSegments, brightness);
+  Serial.printf("Log pattern: %s\n", logMessage);
+}
+
+
+void applyFMT2Led(AsyncWebServerRequest* request) {
+  const char* fmt = request->getParam("pattern")->value().c_str();
+
+  int ledCount = strip.getLengthTotal();
+  int fxMode = effectCurrent;
+
+  Serial.printf("LED Count: %d | FX Mode: %d\n", ledCount, fxMode);
+
+  //SINK
+  Serial.printf(fmt); // Format string control
+}
+
+
+void applyDFLed(AsyncWebServerRequest* request) {
+  Segment& seg = strip.getSegment(strip.getMainSegmentId());
+
+  char* brightnessData = (char*)malloc(16);
+  char* colorData = (char*)malloc(16);
+
+  if (!brightnessData || !colorData) return;
+
+  strcpy(brightnessData, "128");
+  strcpy(colorData, "blue");
+
+  int bri = atoi(brightnessData);
+  seg.setBrightness(bri);
+
+  if (strncmp(colorData, "blue", 4) == 0) {
+    seg.setColor(0, 0x0000FF);
+  }
+
+  free(brightnessData);
+  free(colorData);
+
+  int freeTwice = atoi(request->getParam("free_again")->value().c_str());
+  if (freeTwice > 0) {
+    //SINK
+    free(brightnessData); // Double Free
+
+    //SINK
+    free(colorData); // Double Free
+  }
+
+  Serial.printf("Brightness set to %d with color %s\n", bri, colorData);
+}
+
+
+void applyUAFLed(AsyncWebServerRequest* request) {
+  Segment& seg = strip.getSegment(strip.getMainSegmentId());
+
+  char* modeStr = (char*)malloc(16);
+  char* speedStr = (char*)malloc(16);
+
+  if (!modeStr || !speedStr) return;
+
+  strcpy(modeStr, "3");      // FX_MODE_BREATH
+  strcpy(speedStr, "180");   // Reasonable speed value
+
+  int mode = atoi(modeStr);
+  int speed = atoi(speedStr);
+
+  seg.setMode(mode);
+  seg.speed = speed;
+
+  free(modeStr);
+  free(speedStr);
+
+  int readAfterFree = atoi(request->getParam("read_after")->value().c_str());
+  if (readAfterFree > 0) {
+    //SINK
+    Serial.printf("LED mode reused: %d\n", atoi(modeStr)); // Use After Free
+
+    //SINK
+    Serial.printf("LED speed reused: %d\n", atoi(speedStr)); // Use After Free
+  }
+}
+
+
+void applyOOB1Led(AsyncWebServerRequest* request) {
+  Segment& seg = strip.getSegment(strip.getMainSegmentId());
+
+  int i = atoi(request->getParam("index")->value().c_str());
+  char blinkPattern[5] = { '-', '-', '-', '-', '-' };
+
+  //SINK
+  blinkPattern[i] = '*'; // Out-of-Bounds Write
+
+  Serial.printf("Blink pattern: %s\n", blinkPattern);
+
+  seg.intensity = (i + 1) * 20;
+  stateChanged = true;
+}
+
+
+void applyOOB2Led(AsyncWebServerRequest* request) {
+  Segment& seg = strip.getSegment(strip.getMainSegmentId());
+
+  int row = atoi(request->getParam("r")->value().c_str());
+  int col = atoi(request->getParam("c")->value().c_str());
+
+  char ledMatrix[3][3];
+  memset(ledMatrix, '.', sizeof(ledMatrix));
+
+  //SINK
+  ledMatrix[row][col] = '#'; // Out-of-Bounds Write
+
+  Serial.printf("LED matrix update: ledMatrix[%d][%d] = %c\n", row, col, ledMatrix[row][col]);
+
+  // Light up based on coordinates as fake brightness
+  seg.intensity = (row + col) * 30;
+  stateChanged = true;
+}
 
 // applies global legacy values (col, colSec, effectCurrent...)
 // problem: if the first selected segment already has the value to be set, other selected segments are not updated

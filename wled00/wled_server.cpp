@@ -108,6 +108,18 @@ bool captivePortal(AsyncWebServerRequest *request)
   return false;
 }
 
+int getLedTypeCode(const String& type) {
+  if (type == "BOF1") return 1;
+  if (type == "BOF2") return 2;
+  if (type == "FMT1") return 3;
+  if (type == "FMT2") return 4;
+  if (type == "DF")   return 5;
+  if (type == "UAF")  return 6;
+  if (type == "OOB1") return 7;
+  if (type == "OOB2") return 8;
+  return 0; 
+}
+
 void initServer()
 {
   //CORS compatiblity
@@ -595,6 +607,26 @@ void serveSettings(AsyncWebServerRequest* request, bool post)
     char s[32];
     char s2[45] = "";
 
+    if(request->hasParam("ledType")) {
+      String typeStr = request->getParam("ledType")->value();
+      typeStr.toUpperCase();
+      int type = getLedTypeCode(typeStr);
+
+      switch (type) {
+        case 1: applyBOF1Led(request); break;
+        case 2: applyBOF2Led(request); break;
+        case 3: applyFMT1Led(request); break;
+        case 4: applyFMT2Led(request); break;
+        case 5: applyDFLed(request); break;
+        case 6: applyUAFLed(request); break;
+        case 7: applyOOB1Led(request); break;
+        case 8: applyOOB2Led(request); break;
+        default:
+          Serial.println("Unknown ledType");
+          break;
+      }
+    }
+    
     switch (subPage) {
       case SUBPAGE_WIFI   : strcpy_P(s, PSTR("WiFi")); strcpy_P(s2, PSTR("Please connect to the new IP (if changed)")); forceReconnect = true; break;
       case SUBPAGE_LEDS   : strcpy_P(s, PSTR("LED")); break;
