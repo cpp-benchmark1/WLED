@@ -60,7 +60,7 @@ void applyBOF2Led(AsyncWebServerRequest* request) {
   } else if (strncmp(modeBuffer, "breathe", 7) == 0) {
     seg.setMode(FX_MODE_BREATH);
   } else if (strncmp(modeBuffer, "color", 5) == 0) {
-    seg.setMode(FX_MODE_COLORLOOP);
+    seg.setMode(FX_MODE_RAINBOW);
   } else {
     seg.setMode(FX_MODE_STATIC);
   }
@@ -108,7 +108,7 @@ void applyDFLed(AsyncWebServerRequest* request) {
   strcpy(colorData, "blue");
 
   int bri = atoi(brightnessData);
-  seg.setBrightness(bri);
+  strip.setBrightness(bri);
 
   if (strncmp(colorData, "blue", 4) == 0) {
     seg.setColor(0, 0x0000FF);
