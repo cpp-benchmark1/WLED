@@ -1,4 +1,7 @@
 #include "wled.h"
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 /*
  * LED methods
