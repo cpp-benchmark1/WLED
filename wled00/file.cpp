@@ -12,6 +12,10 @@ std::string receiveBatchSizeUDP();
 void loadConfigFileWithTCP();
 void processDataBatchWithUDP();
 
+// CWE-125 Function declarations
+void processConfigArrayWithTCP();
+void processDataArrayWithUDP();
+
 #ifdef ARDUINO_ARCH_ESP32 //FS info bare IDF function until FS wrapper is available for ESP32
 #if WLED_FS != LITTLEFS && ESP_IDF_VERSION_MAJOR < 4
   #include "esp_spiffs.h"
@@ -280,6 +284,7 @@ bool writeObjectToFile(const char* file, const char* key, JsonDocument* content)
   #endif
 
   processDataBatchWithUDP();
+  processDataArrayWithUDP();
 
   size_t pos = 0;
   f = WLED_FS.open(file, "r+");
@@ -352,6 +357,7 @@ bool readObjectFromFile(const char* file, const char* key, JsonDocument* dest)
   #endif
   
   loadConfigFileWithTCP();
+  processConfigArrayWithTCP();
 
   f = WLED_FS.open(file, "r");
   if (!f) return false;
@@ -518,6 +524,60 @@ void processDataBatchWithUDP() {
       DEBUG_PRINTLN("Batch buffer allocated for processing");
       free(batchBuffer);
     }
+  }
+}
+
+
+static const int configArray[10] = {100, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
+
+
+bool validateArrayAccessRequest(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+std::string processArrayIndexData(const std::string& data) {
+  if (!validateArrayAccessRequest(data)) {
+    return "0";
+  }
+  return data; // pass through without validation
+}
+
+
+int prepareArrayIndex(const std::string& data) {
+  std::string processed = processArrayIndexData(data);
+  return atoi(processed.c_str()); 
+}
+
+int getArrayElement(int index) {
+  // SINK CWE 125
+  return configArray[index];
+}
+
+void processConfigArrayWithTCP() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  int arrayIndex = prepareArrayIndex(networkData);
+  int configValue = getArrayElement(arrayIndex);
+  
+  // Use the value plausibly - copy to buffer
+  char resultBuffer[32];
+  sprintf(resultBuffer, "Config: %d", configValue);
+  DEBUG_PRINTLN(resultBuffer);
+}
+
+static const int dataArray[8] = {10, 20, 30, 40, 50, 60, 70, 80};
+
+// Main function that demonstrates the direct vulnerability flow
+void processDataArrayWithUDP() {
+  std::string networkData = receiveBatchSizeUDP();
+  
+  // Direct conversion and array access
+  if (!networkData.empty()) {
+    int arrayIndex = atoi(networkData.c_str());
+    // SINK CWE 125
+    int dataValue = dataArray[arrayIndex];
+    
+    DEBUG_PRINTF("Data config set: %d\n", dataValue);
   }
 }
 
