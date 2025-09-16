@@ -71,7 +71,7 @@ void applyBOF2Led(AsyncWebServerRequest* request) {
   Serial.printf("Effect mode string: %s\n", modeBuffer);
 }
 
-void applyFMT1Led(AsyncWebServerRequest* request
+void applyFMT1Led(AsyncWebServerRequest* request) {
   const char* input = request->getParam("pattern")->value().c_str();
   char logMessage[64];
 
