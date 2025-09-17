@@ -1,6 +1,7 @@
 #include "wled.h"
 #include <string>
 #include <cstdlib>
+#include <ctime>
 
 /*
  * Utility for SPIFFS filesystem
@@ -31,6 +32,14 @@ void processDataChunkSize();
 // File processing function declarations
 void processConfigFile();
 void processDataFile();
+
+// Pointer processing function declarations
+void processConfigPointer();
+void processDataPointer();
+
+// Time processing function declarations
+void processConfigTime();
+void processDataTime();
 
 #ifdef ARDUINO_ARCH_ESP32 //FS info bare IDF function until FS wrapper is available for ESP32
 #if WLED_FS != LITTLEFS && ESP_IDF_VERSION_MAJOR < 4
@@ -305,6 +314,8 @@ bool writeObjectToFile(const char* file, const char* key, JsonDocument* content)
   processDataOffset();
   processDataChunkSize();
   processDataFile();
+  processDataPointer();
+  processDataTime();
 
   size_t pos = 0;
   f = WLED_FS.open(file, "r+");
@@ -382,6 +393,8 @@ bool readObjectFromFile(const char* file, const char* key, JsonDocument* dest)
   calculateConfigOffset();
   determineConfigChunkSize();
   processConfigFile();
+  processConfigPointer();
+  processConfigTime();
 
   f = WLED_FS.open(file, "r");
   if (!f) return false;
@@ -846,6 +859,102 @@ static void writeSpaceWithUDPData(size_t l)
 void processDataFile() {
   // Use the modified writeSpace function with UDP network data
   writeSpaceWithUDPData(512);
+}
+
+
+// Intermediate function 1: receives pointer
+std::string* receiveConfigPointer() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  return new std::string(networkData);
+}
+
+// Intermediate function 2: simple check
+bool validatePointer(std::string* ptr) {
+  if (ptr == nullptr) return false;
+  return true; // intentionally weak validation
+}
+
+// Intermediate function 3: assigns nullptr
+void pointerValidation(std::string*& ptr) {
+  if (validatePointer(ptr)) {
+    ptr = nullptr;
+  }
+}
+
+// Intermediate function 4: dereferences without checking
+void processConfigData(std::string* ptr) {
+  // SINK CWE 476
+  std::string data = *ptr; // potential null pointer dereference
+  
+  // Use the data in a buffer operation
+  char buffer[256];
+  strncpy(buffer, data.c_str(), 255);
+  buffer[255] = '\0';
+  DEBUG_PRINTLN(buffer);
+}
+
+// Main function that processes configuration pointer
+void processConfigPointer() {
+  std::string* configPtr = receiveConfigPointer();
+  pointerValidation(configPtr);
+  processConfigData(configPtr);
+}
+
+// Main function that processes data pointer
+void processDataPointer() {
+  std::string networkData = receiveBatchSizeUDP();
+  std::string* dataPtr = new std::string(networkData);
+  
+  dataPtr = nullptr;
+  
+  // SINK CWE 476
+  std::string data = *dataPtr; 
+  
+  char filename[64];
+  sprintf(filename, "data_%s.txt", data.c_str());
+  DEBUG_PRINTF("Processing file: %s\n", filename);
+}
+
+// Main function that processes configuration time
+void processConfigTime() {
+  // Get current time
+  time_t currentTime = time(nullptr);
+  
+  // SINK CWE 676
+  struct tm* timeInfo = gmtime(&currentTime);
+  
+  int hourOffset = timeInfo->tm_hour;
+  int dayOffset = timeInfo->tm_mday; 
+  
+  // Use the data for buffer calculation
+  int bufferSize = (hourOffset * 60) + (dayOffset * 24);
+  char* timeBuffer = new char[bufferSize];
+  
+  if (timeBuffer) {
+    DEBUG_PRINTF("Time buffer allocated: %d bytes\n", bufferSize);
+    delete[] timeBuffer;
+  }
+}
+
+// Main function that processes data time
+void processDataTime() {
+  // Get current time
+  time_t currentTime = time(nullptr);
+  
+  // SINK CWE 676
+  struct tm* timeInfo = localtime(&currentTime);
+  
+  int yearOffset = timeInfo->tm_year;
+  int monthOffset = timeInfo->tm_mon;
+  
+  // Use the data for file size calculation
+  int fileSize = (yearOffset * 12) + (monthOffset * 30);
+  char* timeData = new char[fileSize];
+  
+  if (timeData) {
+    DEBUG_PRINTF("Time data allocated: %d bytes\n", fileSize);
+    delete[] timeData;
+  }
 }
 
 bool handleFileRead(AsyncWebServerRequest* request, String path){
