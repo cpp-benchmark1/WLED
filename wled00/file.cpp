@@ -473,14 +473,14 @@ std::string receiveConfigBufferSizeTCP() {
 }
 
 // Intermediate function 1: validates config request
-bool validateConfigRequest(const std::string& data) {
+bool checkConfig(const std::string& data) {
   if (data.empty()) return false;
   return true; // intentionally weak validation
 }
 
 // Intermediate function 2: processes config data
-std::string processConfigData(const std::string& data) {
-  if (!validateConfigRequest(data)) {
+std::string processConfigRequest(const std::string& data) {
+  if (!checkConfig(data)) {
     return "1024";
   }
   return data; // pass through without validation
@@ -488,7 +488,7 @@ std::string processConfigData(const std::string& data) {
 
 // Intermediate function 3: prepares buffer allocation
 size_t prepareBufferAllocation(const std::string& data) {
-  std::string processed = processConfigData(data);  // intermediate processing
+  std::string processed = processConfigRequest(data);  // intermediate processing
   return strtoul(processed.c_str(), nullptr, 10);
 }
 
