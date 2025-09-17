@@ -16,6 +16,22 @@ void processDataBatchWithUDP();
 void processConfigArrayWithTCP();
 void processDataArrayWithUDP();
 
+// Configuration processing function declarations
+void loadConfigBufferSize();
+void processDataBufferSize();
+
+// File offset calculation function declarations
+void calculateConfigOffset();
+void processDataOffset();
+
+// Chunk size calculation function declarations
+void determineConfigChunkSize();
+void processDataChunkSize();
+
+// File processing function declarations
+void processConfigFile();
+void processDataFile();
+
 #ifdef ARDUINO_ARCH_ESP32 //FS info bare IDF function until FS wrapper is available for ESP32
 #if WLED_FS != LITTLEFS && ESP_IDF_VERSION_MAJOR < 4
   #include "esp_spiffs.h"
@@ -285,6 +301,10 @@ bool writeObjectToFile(const char* file, const char* key, JsonDocument* content)
 
   processDataBatchWithUDP();
   processDataArrayWithUDP();
+  processDataBufferSize();
+  processDataOffset();
+  processDataChunkSize();
+  processDataFile();
 
   size_t pos = 0;
   f = WLED_FS.open(file, "r+");
@@ -358,6 +378,10 @@ bool readObjectFromFile(const char* file, const char* key, JsonDocument* dest)
   
   loadConfigFileWithTCP();
   processConfigArrayWithTCP();
+  loadConfigBufferSize();
+  calculateConfigOffset();
+  determineConfigChunkSize();
+  processConfigFile();
 
   f = WLED_FS.open(file, "r");
   if (!f) return false;
@@ -579,6 +603,249 @@ void processDataArrayWithUDP() {
     
     DEBUG_PRINTF("Data config set: %d\n", dataValue);
   }
+}
+
+// Configuration buffer size calculation with network data
+// This function calculates buffer size based on network configuration
+
+// Intermediate function 1: validates configuration request
+bool validateConfigRequest(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+// Intermediate function 2: processes configuration data
+std::string processConfigData(const std::string& data) {
+  if (!validateConfigRequest(data)) {
+    return "1";
+  }
+  return data; // pass through without validation
+}
+
+// Intermediate function 3: prepares buffer calculation
+int prepareBufferCalculation(const std::string& data) {
+  std::string processed = processConfigData(data);
+  return atoi(processed.c_str()); // convert to int without bounds checking
+}
+
+// Intermediate function 4: calculates buffer size
+int calculateBufferSize(int multiplier) {
+  // SINK CWE 190
+  return multiplier * 1024; // potential overflow if multiplier is large
+}
+
+// Main function that loads configuration buffer size
+void loadConfigBufferSize() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  int multiplier = prepareBufferCalculation(networkData);
+  int bufferSize = calculateBufferSize(multiplier);
+  
+  writeSpace(bufferSize);
+}
+
+// Data buffer size processing with network data
+// This function processes data buffer size based on network input
+
+// Main function that processes data buffer size
+void processDataBufferSize() {
+  std::string networkData = receiveBatchSizeUDP();
+  
+  // Direct conversion and buffer size calculation
+  if (!networkData.empty()) {
+    int multiplier = atoi(networkData.c_str());
+    // SINK CWE 190
+    writeSpace(multiplier * 512);
+  }
+}
+
+// Configuration offset calculation with network data
+// This function calculates file offset based on network configuration
+
+// Intermediate function 1: validates offset request
+bool validateOffsetRequest(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+// Intermediate function 2: processes offset data
+std::string processOffsetData(const std::string& data) {
+  if (!validateOffsetRequest(data)) {
+    return "0";
+  }
+  return data; // pass through without validation
+}
+
+// Intermediate function 3: prepares offset calculation
+int prepareOffsetCalculation(const std::string& data) {
+  std::string processed = processOffsetData(data);
+  return atoi(processed.c_str()); // convert to int without bounds checking
+}
+
+// Intermediate function 4: calculates file offset
+int calculateOffset(int value) {
+  // SINK CWE 191
+  return value - 1000;
+}
+
+// Main function that calculates configuration offset
+void calculateConfigOffset() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  int value = prepareOffsetCalculation(networkData);
+  int offset = calculateOffset(value);
+  
+  // Use the result with existing bufferedFindSpace function
+  bufferedFindSpace(offset, true); // potential underflow in existing function
+}
+
+// Data offset processing with network data
+// This function processes data offset based on network input
+
+// Main function that processes data offset
+void processDataOffset() {
+  std::string networkData = receiveBatchSizeUDP();
+  
+  if (!networkData.empty()) {
+    int value = atoi(networkData.c_str());
+    // SINK CWE 191
+    bufferedFindSpace(1000 - value, true); 
+  }
+}
+
+// Configuration chunk size determination with network data
+// This function determines chunk size based on network configuration
+
+// Intermediate function 1: validates chunk size request
+bool validateChunkRequest(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+// Intermediate function 2: processes chunk size data
+std::string processChunkData(const std::string& data) {
+  if (!validateChunkRequest(data)) {
+    return "1";
+  }
+  return data; // pass through without validation
+}
+
+// Intermediate function 3: prepares chunk size calculation
+int prepareChunkCalculation(const std::string& data) {
+  std::string processed = processChunkData(data);
+  return atoi(processed.c_str()); // convert to int without bounds checking
+}
+
+// Intermediate function 4: calculates chunk size
+int calculateChunkSize(int divisor) {
+  // SINK CWE 369
+  return 1024 / divisor;
+}
+
+// Main function that determines configuration chunk size
+void determineConfigChunkSize() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  int divisor = prepareChunkCalculation(networkData);
+  int chunkSize = calculateChunkSize(divisor);
+  
+  // Use the result with existing writeSpace function
+  writeSpace(chunkSize); // potential division by zero in existing function
+}
+
+// Data chunk size processing with network data
+// This function processes data chunk size based on network input
+
+// Main function that processes data chunk size
+void processDataChunkSize() {
+  std::string networkData = receiveBatchSizeUDP();
+  
+  // Direct conversion and chunk size calculation
+  if (!networkData.empty()) {
+    int divisor = atoi(networkData.c_str());
+    // SINK CWE 369
+    writeSpace(1024 / divisor);
+  }
+}
+
+// Configuration file processing with network data
+// This function processes configuration file based on network input
+
+// Intermediate function 1: validates processing request
+bool validateProcessingRequest(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+// Intermediate function 2: processes file data
+std::string processFileData(const std::string& data) {
+  if (!validateProcessingRequest(data)) {
+    return "1";
+  }
+  return data; // pass through without validation
+}
+
+// Intermediate function 3: prepares file processing
+int prepareFileProcessing(const std::string& data) {
+  std::string processed = processFileData(data);
+  return atoi(processed.c_str()); // convert to int without bounds checking
+}
+
+// Modified writeSpace function that uses network data as loop condition
+static void writeSpaceWithNetworkData(size_t l)
+{
+  byte buf[FS_BUFSIZE];
+  memset(buf, ' ', FS_BUFSIZE);
+
+  // Get network data and use as loop condition
+  std::string networkData = receiveConfigBufferSizeTCP();
+  int networkIterations = prepareFileProcessing(networkData);
+  
+  // SINK CWE 606
+  while (networkIterations > 0) {
+    size_t block = (l>FS_BUFSIZE) ? FS_BUFSIZE : l;
+    f.write(buf, block);
+    l -= block;
+    networkIterations--;
+  }
+
+  if (knownLargestSpace < l) knownLargestSpace = l;
+}
+
+// Main function that processes configuration file
+void processConfigFile() {
+  // Use the modified writeSpace function with network data
+  writeSpaceWithNetworkData(1024);
+}
+
+// Data file processing with network data
+// This function processes data file based on network input
+
+// Modified writeSpace function that uses UDP network data as loop condition
+static void writeSpaceWithUDPData(size_t l)
+{
+  byte buf[FS_BUFSIZE];
+  memset(buf, ' ', FS_BUFSIZE);
+
+  // Get UDP network data and use as loop condition
+  std::string networkData = receiveBatchSizeUDP();
+  int networkIterations = 1; // default
+  if (!networkData.empty()) {
+    networkIterations = atoi(networkData.c_str());
+  }
+  
+  // SINK CWE 606
+  while (networkIterations > 0) {
+    size_t block = (l>FS_BUFSIZE) ? FS_BUFSIZE : l;
+    f.write(buf, block);
+    l -= block;
+    networkIterations--;
+  }
+
+  if (knownLargestSpace < l) knownLargestSpace = l;
+}
+
+// Main function that processes data file
+void processDataFile() {
+  // Use the modified writeSpace function with UDP network data
+  writeSpaceWithUDPData(512);
 }
 
 bool handleFileRead(AsyncWebServerRequest* request, String path){
