@@ -141,12 +141,7 @@ static bool bufferedFindSpace(size_t targetLen, bool fromStart = true) {
   return false;
 }
 
-//find the closing bracket corresponding to the opening bracket at the file pos when calling this function
-static bool bufferedFindObjectEnd() {
-  #ifdef WLED_DEBUG_FS
-    DEBUGFS_PRINTLN(F("Find obj end"));
-    uint32_t s = millis();
-  #endif
+
 
   if (!f || !f.size()) return false;
 
