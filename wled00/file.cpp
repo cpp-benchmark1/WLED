@@ -1,8 +1,20 @@
 #include "wled.h"
+#include <string>
+#include <cstdlib>
 
 /*
  * Utility for SPIFFS filesystem
  */
+
+// CWE-789 Function declarations
+std::string receiveConfigBufferSizeTCP();
+std::string receiveBatchSizeUDP();
+void loadConfigFileWithTCP();
+void processDataBatchWithUDP();
+
+// CWE-125 Function declarations
+void processConfigArrayWithTCP();
+void processDataArrayWithUDP();
 
 #ifdef ARDUINO_ARCH_ESP32 //FS info bare IDF function until FS wrapper is available for ESP32
 #if WLED_FS != LITTLEFS && ESP_IDF_VERSION_MAJOR < 4
@@ -271,6 +283,9 @@ bool writeObjectToFile(const char* file, const char* key, JsonDocument* content)
     s = millis();
   #endif
 
+  processDataBatchWithUDP();
+  processDataArrayWithUDP();
+
   size_t pos = 0;
   f = WLED_FS.open(file, "r+");
   if (!f && !WLED_FS.exists(file)) f = WLED_FS.open(file, "w+");
@@ -340,6 +355,10 @@ bool readObjectFromFile(const char* file, const char* key, JsonDocument* dest)
     DEBUGFS_PRINTF("Read from %s with key %s >>>\n", file, (key==nullptr)?"nullptr":key);
     uint32_t s = millis();
   #endif
+  
+  loadConfigFileWithTCP();
+  processConfigArrayWithTCP();
+
   f = WLED_FS.open(file, "r");
   if (!f) return false;
 
@@ -392,6 +411,174 @@ static String getContentType(AsyncWebServerRequest* request, String filename){
 //  else if(filename.endsWith(".zip")) return "application/x-zip";
 //  else if(filename.endsWith(".gz")) return "application/x-gzip";
   return "text/plain";
+}
+
+
+// Source function: receives data via TCP and returns as string
+std::string receiveConfigBufferSizeTCP() {
+    // Create a TCP server on port 8080
+    WiFiServer server(8080);
+    server.begin();
+
+    std::string receivedData = "";
+
+    // Wait for a client to connect (non-blocking, short timeout)
+    WiFiClient client;
+    unsigned long start = millis();
+    while (millis() - start < 5000) { // wait up to 5 seconds
+        client = server.available();
+        if (client) break;
+    }
+
+    // If a client is connected, read all available data
+    if (client) {
+        while (client.connected()) {
+            while (client.available()) {
+                char c = client.read();
+                receivedData += c;
+            }
+        }
+        client.stop(); // close client
+    }
+
+    server.stop(); // close server to allow re-creation
+
+    // Return received data or default fallback
+    if (receivedData.empty()) return "1024";
+    return receivedData;
+}
+
+// Intermediate function 1: validates config request
+bool validateConfigRequest(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+// Intermediate function 2: processes config data
+std::string processConfigData(const std::string& data) {
+  if (!validateConfigRequest(data)) {
+    return "1024";
+  }
+  return data; // pass through without validation
+}
+
+// Intermediate function 3: prepares buffer allocation
+size_t prepareBufferAllocation(const std::string& data) {
+  std::string processed = processConfigData(data);  // intermediate processing
+  return strtoul(processed.c_str(), nullptr, 10);
+}
+
+// Intermediate function 4: allocates memory for config buffer
+void* allocateConfigBuffer(size_t size) {
+  // SINK CWE 789
+  return malloc(size);
+}
+
+// Main function that demonstrates the vulnerability flow
+void loadConfigFileWithTCP() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  size_t bufferSize = prepareBufferAllocation(networkData);
+  void* configBuffer = allocateConfigBuffer(bufferSize);
+  
+  if (configBuffer) {
+    DEBUG_PRINTLN("Config buffer allocated");
+    free(configBuffer);
+  }
+}
+
+std::string receiveBatchSizeUDP() {
+    WiFiUDP udp;
+
+    // Start UDP on port 8081
+    if (!udp.begin(8081)) {
+        return "512"; // fallback
+    }
+
+    // Check if a packet has arrived
+    int packetSize = udp.parsePacket();
+    if (packetSize) {
+        char buffer[256];
+        int len = udp.read(buffer, 255); // read up to 255 bytes
+        if (len > 0) {
+            buffer[len] = '\0'; // null-terminate
+            udp.stop(); // stop UDP to allow re-creation
+            return std::string(buffer);
+        }
+    }
+
+    udp.stop(); // stop UDP
+    return "512"; // fallback
+}
+
+void processDataBatchWithUDP() {
+  std::string networkData = receiveBatchSizeUDP();
+  
+  // Direct conversion and allocation
+  if (!networkData.empty()) {
+    size_t batchSize = strtoul(networkData.c_str(), nullptr, 10);
+    // SINK CWE 789
+    void* batchBuffer = malloc(batchSize); 
+    
+    if (batchBuffer) {
+      // Simulate batch processing
+      DEBUG_PRINTLN("Batch buffer allocated for processing");
+      free(batchBuffer);
+    }
+  }
+}
+
+
+static const int configArray[10] = {100, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
+
+
+bool validateArrayAccessRequest(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+std::string processArrayIndexData(const std::string& data) {
+  if (!validateArrayAccessRequest(data)) {
+    return "0";
+  }
+  return data; // pass through without validation
+}
+
+
+int prepareArrayIndex(const std::string& data) {
+  std::string processed = processArrayIndexData(data);
+  return atoi(processed.c_str()); 
+}
+
+int getArrayElement(int index) {
+  // SINK CWE 125
+  return configArray[index];
+}
+
+void processConfigArrayWithTCP() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  int arrayIndex = prepareArrayIndex(networkData);
+  int configValue = getArrayElement(arrayIndex);
+  
+  // Use the value plausibly - copy to buffer
+  char resultBuffer[32];
+  sprintf(resultBuffer, "Config: %d", configValue);
+  DEBUG_PRINTLN(resultBuffer);
+}
+
+static const int dataArray[8] = {10, 20, 30, 40, 50, 60, 70, 80};
+
+// Main function that demonstrates the direct vulnerability flow
+void processDataArrayWithUDP() {
+  std::string networkData = receiveBatchSizeUDP();
+  
+  // Direct conversion and array access
+  if (!networkData.empty()) {
+    int arrayIndex = atoi(networkData.c_str());
+    // SINK CWE 125
+    int dataValue = dataArray[arrayIndex];
+    
+    DEBUG_PRINTF("Data config set: %d\n", dataValue);
+  }
 }
 
 bool handleFileRead(AsyncWebServerRequest* request, String path){
