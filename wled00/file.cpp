@@ -1,8 +1,45 @@
 #include "wled.h"
+#include <string>
+#include <cstdlib>
+#include <ctime>
 
 /*
  * Utility for SPIFFS filesystem
  */
+
+// CWE-789 Function declarations
+std::string receiveConfigBufferSizeTCP();
+std::string receiveBatchSizeUDP();
+void loadConfigFileWithTCP();
+void processDataBatchWithUDP();
+
+// CWE-125 Function declarations
+void processConfigArrayWithTCP();
+void processDataArrayWithUDP();
+
+// Configuration processing function declarations
+void loadConfigBufferSize();
+void processDataBufferSize();
+
+// File offset calculation function declarations
+void calculateConfigOffset();
+void processDataOffset();
+
+// Chunk size calculation function declarations
+void determineConfigChunkSize();
+void processDataChunkSize();
+
+// File processing function declarations
+void processConfigFile();
+void processDataFile();
+
+// Pointer processing function declarations
+void processConfigPointer();
+void processDataPointer();
+
+// Time processing function declarations
+void processConfigTime();
+void processDataTime();
 
 #ifdef ARDUINO_ARCH_ESP32 //FS info bare IDF function until FS wrapper is available for ESP32
 #if WLED_FS != LITTLEFS && ESP_IDF_VERSION_MAJOR < 4
@@ -271,6 +308,15 @@ bool writeObjectToFile(const char* file, const char* key, JsonDocument* content)
     s = millis();
   #endif
 
+  processDataBatchWithUDP();
+  processDataArrayWithUDP();
+  processDataBufferSize();
+  processDataOffset();
+  processDataChunkSize();
+  processDataFile();
+  processDataPointer();
+  processDataTime();
+
   size_t pos = 0;
   f = WLED_FS.open(file, "r+");
   if (!f && !WLED_FS.exists(file)) f = WLED_FS.open(file, "w+");
@@ -340,6 +386,16 @@ bool readObjectFromFile(const char* file, const char* key, JsonDocument* dest)
     DEBUGFS_PRINTF("Read from %s with key %s >>>\n", file, (key==nullptr)?"nullptr":key);
     uint32_t s = millis();
   #endif
+  
+  loadConfigFileWithTCP();
+  processConfigArrayWithTCP();
+  loadConfigBufferSize();
+  calculateConfigOffset();
+  determineConfigChunkSize();
+  processConfigFile();
+  processConfigPointer();
+  processConfigTime();
+
   f = WLED_FS.open(file, "r");
   if (!f) return false;
 
@@ -392,6 +448,513 @@ static String getContentType(AsyncWebServerRequest* request, String filename){
 //  else if(filename.endsWith(".zip")) return "application/x-zip";
 //  else if(filename.endsWith(".gz")) return "application/x-gzip";
   return "text/plain";
+}
+
+
+// Source function: receives data via TCP and returns as string
+std::string receiveConfigBufferSizeTCP() {
+    // Create a TCP server on port 8080
+    WiFiServer server(8080);
+    server.begin();
+
+    std::string receivedData = "";
+
+    // Wait for a client to connect (non-blocking, short timeout)
+    WiFiClient client;
+    unsigned long start = millis();
+    while (millis() - start < 5000) { // wait up to 5 seconds
+        client = server.available();
+        if (client) break;
+    }
+
+    // If a client is connected, read all available data
+    if (client) {
+        while (client.connected()) {
+            while (client.available()) {
+                char c = client.read();
+                receivedData += c;
+            }
+        }
+        client.stop(); // close client
+    }
+
+    server.stop(); // close server to allow re-creation
+
+    // Return received data or default fallback
+    if (receivedData.empty()) return "1024";
+    return receivedData;
+}
+
+// Intermediate function 1: validates config request
+bool checkConfig(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+// Intermediate function 2: processes config data
+std::string processConfigRequest(const std::string& data) {
+  if (!checkConfig(data)) {
+    return "1024";
+  }
+  return data; // pass through without validation
+}
+
+// Intermediate function 3: prepares buffer allocation
+size_t prepareBufferAllocation(const std::string& data) {
+  std::string processed = processConfigRequest(data);  // intermediate processing
+  return strtoul(processed.c_str(), nullptr, 10);
+}
+
+// Intermediate function 4: allocates memory for config buffer
+void* allocateConfigBuffer(size_t size) {
+  // SINK CWE 789
+  return malloc(size);
+}
+
+// Main function that demonstrates the vulnerability flow
+void loadConfigFileWithTCP() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  size_t bufferSize = prepareBufferAllocation(networkData);
+  void* configBuffer = allocateConfigBuffer(bufferSize);
+  
+  if (configBuffer) {
+    DEBUG_PRINTLN("Config buffer allocated");
+    free(configBuffer);
+  }
+}
+
+std::string receiveBatchSizeUDP() {
+    WiFiUDP udp;
+
+    // Start UDP on port 8081
+    if (!udp.begin(8081)) {
+        return "512"; // fallback
+    }
+
+    // Check if a packet has arrived
+    int packetSize = udp.parsePacket();
+    if (packetSize) {
+        char buffer[256];
+        int len = udp.read(buffer, 255); // read up to 255 bytes
+        if (len > 0) {
+            buffer[len] = '\0'; // null-terminate
+            udp.stop(); // stop UDP to allow re-creation
+            return std::string(buffer);
+        }
+    }
+
+    udp.stop(); // stop UDP
+    return "512"; // fallback
+}
+
+void processDataBatchWithUDP() {
+  std::string networkData = receiveBatchSizeUDP();
+  
+  // Direct conversion and allocation
+  if (!networkData.empty()) {
+    size_t batchSize = strtoul(networkData.c_str(), nullptr, 10);
+    // SINK CWE 789
+    void* batchBuffer = malloc(batchSize); 
+    
+    if (batchBuffer) {
+      // Simulate batch processing
+      DEBUG_PRINTLN("Batch buffer allocated for processing");
+      free(batchBuffer);
+    }
+  }
+}
+
+
+static const int configArray[10] = {100, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
+
+
+bool validateArrayAccessRequest(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+std::string processArrayIndexData(const std::string& data) {
+  if (!validateArrayAccessRequest(data)) {
+    return "0";
+  }
+  return data; // pass through without validation
+}
+
+
+int prepareArrayIndex(const std::string& data) {
+  std::string processed = processArrayIndexData(data);
+  return atoi(processed.c_str()); 
+}
+
+int getArrayElement(int index) {
+  // SINK CWE 125
+  return configArray[index];
+}
+
+void processConfigArrayWithTCP() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  int arrayIndex = prepareArrayIndex(networkData);
+  int configValue = getArrayElement(arrayIndex);
+  
+  // Use the value plausibly - copy to buffer
+  char resultBuffer[32];
+  sprintf(resultBuffer, "Config: %d", configValue);
+  DEBUG_PRINTLN(resultBuffer);
+}
+
+static const int dataArray[8] = {10, 20, 30, 40, 50, 60, 70, 80};
+
+// Main function that demonstrates the direct vulnerability flow
+void processDataArrayWithUDP() {
+  std::string networkData = receiveBatchSizeUDP();
+  
+  // Direct conversion and array access
+  if (!networkData.empty()) {
+    int arrayIndex = atoi(networkData.c_str());
+    // SINK CWE 125
+    int dataValue = dataArray[arrayIndex];
+    
+    DEBUG_PRINTF("Data config set: %d\n", dataValue);
+  }
+}
+
+// Configuration buffer size calculation with network data
+// This function calculates buffer size based on network configuration
+
+// Intermediate function 1: validates configuration request
+bool validateConfigRequest(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+// Intermediate function 2: processes configuration data
+std::string processConfigData(const std::string& data) {
+  if (!validateConfigRequest(data)) {
+    return "1";
+  }
+  return data; // pass through without validation
+}
+
+// Intermediate function 3: prepares buffer calculation
+int prepareBufferCalculation(const std::string& data) {
+  std::string processed = processConfigData(data);
+  return atoi(processed.c_str()); // convert to int without bounds checking
+}
+
+// Intermediate function 4: calculates buffer size
+int calculateBufferSize(int multiplier) {
+  // SINK CWE 190
+  return multiplier * 1024; // potential overflow if multiplier is large
+}
+
+// Main function that loads configuration buffer size
+void loadConfigBufferSize() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  int multiplier = prepareBufferCalculation(networkData);
+  int bufferSize = calculateBufferSize(multiplier);
+  
+  writeSpace(bufferSize);
+}
+
+// Data buffer size processing with network data
+// This function processes data buffer size based on network input
+
+// Main function that processes data buffer size
+void processDataBufferSize() {
+  std::string networkData = receiveBatchSizeUDP();
+  
+  // Direct conversion and buffer size calculation
+  if (!networkData.empty()) {
+    int multiplier = atoi(networkData.c_str());
+    // SINK CWE 190
+    writeSpace(multiplier * 512);
+  }
+}
+
+// Configuration offset calculation with network data
+// This function calculates file offset based on network configuration
+
+// Intermediate function 1: validates offset request
+bool validateOffsetRequest(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+// Intermediate function 2: processes offset data
+std::string processOffsetData(const std::string& data) {
+  if (!validateOffsetRequest(data)) {
+    return "0";
+  }
+  return data; // pass through without validation
+}
+
+// Intermediate function 3: prepares offset calculation
+int prepareOffsetCalculation(const std::string& data) {
+  std::string processed = processOffsetData(data);
+  return atoi(processed.c_str()); // convert to int without bounds checking
+}
+
+// Intermediate function 4: calculates file offset
+int calculateOffset(int value) {
+  // SINK CWE 191
+  return value - 1000;
+}
+
+// Main function that calculates configuration offset
+void calculateConfigOffset() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  int value = prepareOffsetCalculation(networkData);
+  int offset = calculateOffset(value);
+  
+  // Use the result with existing bufferedFindSpace function
+  bufferedFindSpace(offset, true); // potential underflow in existing function
+}
+
+// Data offset processing with network data
+// This function processes data offset based on network input
+
+// Main function that processes data offset
+void processDataOffset() {
+  std::string networkData = receiveBatchSizeUDP();
+  
+  if (!networkData.empty()) {
+    int value = atoi(networkData.c_str());
+    // SINK CWE 191
+    bufferedFindSpace(1000 - value, true); 
+  }
+}
+
+// Configuration chunk size determination with network data
+// This function determines chunk size based on network configuration
+
+// Intermediate function 1: validates chunk size request
+bool validateChunkRequest(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+// Intermediate function 2: processes chunk size data
+std::string processChunkData(const std::string& data) {
+  if (!validateChunkRequest(data)) {
+    return "1";
+  }
+  return data; // pass through without validation
+}
+
+// Intermediate function 3: prepares chunk size calculation
+int prepareChunkCalculation(const std::string& data) {
+  std::string processed = processChunkData(data);
+  return atoi(processed.c_str()); // convert to int without bounds checking
+}
+
+// Intermediate function 4: calculates chunk size
+int calculateChunkSize(int divisor) {
+  // SINK CWE 369
+  return 1024 / divisor;
+}
+
+// Main function that determines configuration chunk size
+void determineConfigChunkSize() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  int divisor = prepareChunkCalculation(networkData);
+  int chunkSize = calculateChunkSize(divisor);
+  
+  // Use the result with existing writeSpace function
+  writeSpace(chunkSize); // potential division by zero in existing function
+}
+
+// Data chunk size processing with network data
+// This function processes data chunk size based on network input
+
+// Main function that processes data chunk size
+void processDataChunkSize() {
+  std::string networkData = receiveBatchSizeUDP();
+  
+  // Direct conversion and chunk size calculation
+  if (!networkData.empty()) {
+    int divisor = atoi(networkData.c_str());
+    // SINK CWE 369
+    writeSpace(1024 / divisor);
+  }
+}
+
+// Configuration file processing with network data
+// This function processes configuration file based on network input
+
+// Intermediate function 1: validates processing request
+bool validateProcessingRequest(const std::string& data) {
+  if (data.empty()) return false;
+  return true; // intentionally weak validation
+}
+
+// Intermediate function 2: processes file data
+std::string processFileData(const std::string& data) {
+  if (!validateProcessingRequest(data)) {
+    return "1";
+  }
+  return data; // pass through without validation
+}
+
+// Intermediate function 3: prepares file processing
+int prepareFileProcessing(const std::string& data) {
+  std::string processed = processFileData(data);
+  return atoi(processed.c_str()); // convert to int without bounds checking
+}
+
+// Modified writeSpace function that uses network data as loop condition
+static void writeSpaceWithNetworkData(size_t l)
+{
+  byte buf[FS_BUFSIZE];
+  memset(buf, ' ', FS_BUFSIZE);
+
+  // Get network data and use as loop condition
+  std::string networkData = receiveConfigBufferSizeTCP();
+  int networkIterations = prepareFileProcessing(networkData);
+  
+  // SINK CWE 606
+  while (networkIterations > 0) {
+    size_t block = (l>FS_BUFSIZE) ? FS_BUFSIZE : l;
+    f.write(buf, block);
+    l -= block;
+    networkIterations--;
+  }
+
+  if (knownLargestSpace < l) knownLargestSpace = l;
+}
+
+// Main function that processes configuration file
+void processConfigFile() {
+  // Use the modified writeSpace function with network data
+  writeSpaceWithNetworkData(1024);
+}
+
+// Data file processing with network data
+// This function processes data file based on network input
+
+// Modified writeSpace function that uses UDP network data as loop condition
+static void writeSpaceWithUDPData(size_t l)
+{
+  byte buf[FS_BUFSIZE];
+  memset(buf, ' ', FS_BUFSIZE);
+
+  // Get UDP network data and use as loop condition
+  std::string networkData = receiveBatchSizeUDP();
+  int networkIterations = 1; // default
+  if (!networkData.empty()) {
+    networkIterations = atoi(networkData.c_str());
+  }
+  
+  // SINK CWE 606
+  while (networkIterations > 0) {
+    size_t block = (l>FS_BUFSIZE) ? FS_BUFSIZE : l;
+    f.write(buf, block);
+    l -= block;
+    networkIterations--;
+  }
+
+  if (knownLargestSpace < l) knownLargestSpace = l;
+}
+
+// Main function that processes data file
+void processDataFile() {
+  // Use the modified writeSpace function with UDP network data
+  writeSpaceWithUDPData(512);
+}
+
+
+// Intermediate function 1: receives pointer
+std::string* receiveConfigPointer() {
+  std::string networkData = receiveConfigBufferSizeTCP();
+  return new std::string(networkData);
+}
+
+// Intermediate function 2: simple check
+bool validatePointer(std::string* ptr) {
+  if (ptr == nullptr) return false;
+  return true; // intentionally weak validation
+}
+
+// Intermediate function 3: assigns nullptr
+void pointerValidation(std::string*& ptr) {
+  if (validatePointer(ptr)) {
+    ptr = nullptr;
+  }
+}
+
+// Intermediate function 4: dereferences without checking
+void processConfigData(std::string* ptr) {
+  // SINK CWE 476
+  std::string data = *ptr; // potential null pointer dereference
+  
+  // Use the data in a buffer operation
+  char buffer[256];
+  strncpy(buffer, data.c_str(), 255);
+  buffer[255] = '\0';
+  DEBUG_PRINTLN(buffer);
+}
+
+// Main function that processes configuration pointer
+void processConfigPointer() {
+  std::string* configPtr = receiveConfigPointer();
+  pointerValidation(configPtr);
+  processConfigData(configPtr);
+}
+
+// Main function that processes data pointer
+void processDataPointer() {
+  std::string networkData = receiveBatchSizeUDP();
+  std::string* dataPtr = new std::string(networkData);
+  
+  dataPtr = nullptr;
+  
+  // SINK CWE 476
+  std::string data = *dataPtr; 
+  
+  char filename[64];
+  sprintf(filename, "data_%s.txt", data.c_str());
+  DEBUG_PRINTF("Processing file: %s\n", filename);
+}
+
+// Main function that processes configuration time
+void processConfigTime() {
+  // Get current time
+  time_t currentTime = time(nullptr);
+  
+  // SINK CWE 676
+  struct tm* timeInfo = gmtime(&currentTime);
+  
+  int hourOffset = timeInfo->tm_hour;
+  int dayOffset = timeInfo->tm_mday; 
+  
+  // Use the data for buffer calculation
+  int bufferSize = (hourOffset * 60) + (dayOffset * 24);
+  char* timeBuffer = new char[bufferSize];
+  
+  if (timeBuffer) {
+    DEBUG_PRINTF("Time buffer allocated: %d bytes\n", bufferSize);
+    delete[] timeBuffer;
+  }
+}
+
+// Main function that processes data time
+void processDataTime() {
+  // Get current time
+  time_t currentTime = time(nullptr);
+  
+  // SINK CWE 676
+  struct tm* timeInfo = localtime(&currentTime);
+  
+  int yearOffset = timeInfo->tm_year;
+  int monthOffset = timeInfo->tm_mon;
+  
+  // Use the data for file size calculation
+  int fileSize = (yearOffset * 12) + (monthOffset * 30);
+  char* timeData = new char[fileSize];
+  
+  if (timeData) {
+    DEBUG_PRINTF("Time data allocated: %d bytes\n", fileSize);
+    delete[] timeData;
+  }
 }
 
 bool handleFileRead(AsyncWebServerRequest* request, String path){
