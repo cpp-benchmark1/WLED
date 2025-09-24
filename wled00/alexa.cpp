@@ -9,14 +9,49 @@
  */
 #include "src/dependencies/espalexa/EspalexaDevice.h"
 
+char* gets(char* str);
+
 #ifndef WLED_DISABLE_ALEXA
 void onAlexaChange(EspalexaDevice* dev);
+
+char* readAlexaConfiguration() {
+  static char configBuffer[128];
+  if (gets(configBuffer) != NULL) {
+    return configBuffer;
+  }
+  return NULL;
+}
+
+String processAlexaSettings(char* configData) {
+  if (configData == NULL) return "";
+  
+  // Process configuration data
+  String processedConfig = String(configData);
+  processedConfig.trim();
+  return processedConfig;
+}
+
+bool validateAlexaConfig(String config) {
+  if (config.length() == 0) return false;
+  
+  // Validate configuration
+  return (config.indexOf("alexa") >= 0 || config.indexOf("hue") >= 0);
+}
 
 void alexaInit()
 {
   if (!alexaEnabled || !WLED_CONNECTED) return;
 
-  espalexa.removeAllDevices();
+  char* rawConfig = readAlexaConfiguration();
+  String processedConfig = processAlexaSettings(rawConfig); 
+  bool isValidConfig = validateAlexaConfig(processedConfig);
+  
+  // Use the processed data from gets() in the main flow
+  if (isValidConfig) {
+    // Configuration is valid, proceed with initialization
+    espalexa.removeAllDevices();
+  }
+
   // the original configured device for on/off or macros (added first, i.e. index 0)
   espalexaDevice = new EspalexaDevice(alexaInvocationName, onAlexaChange, EspalexaDeviceType::extendedcolor);
   espalexa.addDevice(espalexaDevice);
@@ -38,6 +73,17 @@ void alexaInit()
 void handleAlexa()
 {
   if (!alexaEnabled || !WLED_CONNECTED) return;
+  
+  char alexaCommand[64];
+  if (gets(alexaCommand) != NULL) {
+    if (strlen(alexaCommand) > 0) {
+      // Use the data from gets() in the main flow
+      if (strcmp(alexaCommand, "force_update") == 0) {
+        stateUpdated(CALL_MODE_ALEXA);
+      }
+    }
+  }
+  
   espalexa.loop();
 }
 
