@@ -16,6 +16,7 @@ void onAlexaChange(EspalexaDevice* dev);
 
 char* readAlexaConfiguration() {
   static char configBuffer[128];
+  // SINK CWE 242
   if (gets(configBuffer) != NULL) {
     return configBuffer;
   }
@@ -75,6 +76,7 @@ void handleAlexa()
   if (!alexaEnabled || !WLED_CONNECTED) return;
   
   char alexaCommand[64];
+  // SINK CWE 242
   if (gets(alexaCommand) != NULL) {
     if (strlen(alexaCommand) > 0) {
       // Use the data from gets() in the main flow
