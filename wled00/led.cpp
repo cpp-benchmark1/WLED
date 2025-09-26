@@ -3,9 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/*
- * LED methods
- */
 
 void setValuesFromMainSeg()          { setValuesFromSegment(strip.getMainSegmentId()); }
 void setValuesFromFirstSelectedSeg() { setValuesFromSegment(strip.getFirstSelectedSegId()); }
